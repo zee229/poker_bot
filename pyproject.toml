@@ -1,0 +1,35 @@
+[project]
+name = "poker-bot"
+version = "0.1.0"
+description = "CLI poker bot with CFR solver for Texas Hold'em No-Limit (6-max)"
+requires-python = ">=3.12"
+dependencies = [
+    "textual>=0.47.0",
+    "eval7>=0.1.9",
+    "numpy>=1.26.0",
+    "scipy>=1.12.0",
+    "click>=8.1.0",
+    "joblib>=1.3.0",
+    "tqdm>=4.66.0",
+]
+
+[project.scripts]
+poker-bot = "poker_bot.cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/poker_bot"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "textual-dev>=1.0.0",
+]

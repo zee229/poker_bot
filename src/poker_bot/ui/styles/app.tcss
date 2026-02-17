@@ -1,0 +1,218 @@
+/* Main app styles */
+Screen {
+    background: #1a1a2e;
+}
+
+/* Main Menu */
+#main-menu {
+    align: center middle;
+    width: 60;
+    height: auto;
+    padding: 2 4;
+}
+
+#main-menu Label {
+    text-align: center;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#main-menu Button {
+    width: 100%;
+    margin: 1 0;
+}
+
+.title {
+    color: #e94560;
+    text-style: bold;
+    text-align: center;
+}
+
+.subtitle {
+    color: #16213e;
+    text-align: center;
+}
+
+/* Poker Table */
+#poker-table {
+    background: #076324;
+    border: thick #0a4a1c;
+    width: 100%;
+    height: 100%;
+    padding: 1;
+}
+
+.board-area {
+    align: center middle;
+    height: auto;
+    width: 100%;
+    margin: 1 0;
+}
+
+.seat-row {
+    align: center middle;
+    height: auto;
+    width: 100%;
+}
+
+/* Player Widgets */
+.player-widget {
+    width: 20;
+    height: 5;
+    border: round #555;
+    padding: 0 1;
+    margin: 0 1;
+}
+
+.player-widget.active {
+    border: round #e94560;
+    background: #2a2a4e;
+}
+
+.player-widget.folded {
+    opacity: 0.5;
+}
+
+.player-name {
+    color: #fff;
+    text-style: bold;
+}
+
+.player-stack {
+    color: #f0c040;
+}
+
+.player-bet {
+    color: #90ee90;
+}
+
+/* Card Widget */
+.card {
+    width: 7;
+    height: 5;
+    margin: 0 1;
+    background: #fff;
+    color: #000;
+    border: tall #ccc;
+    padding: 0;
+}
+
+.card.red {
+    color: #e94560;
+}
+
+.card.black {
+    color: #1a1a2e;
+}
+
+.card.facedown {
+    background: #4a69bd;
+    color: #4a69bd;
+}
+
+/* Action Bar */
+#action-bar {
+    dock: bottom;
+    height: 5;
+    background: #16213e;
+    padding: 1 2;
+}
+
+#action-bar Button {
+    margin: 0 1;
+    min-width: 10;
+}
+
+#action-bar .fold-btn {
+    background: #e94560;
+}
+
+#action-bar .check-btn {
+    background: #2ecc71;
+}
+
+#action-bar .call-btn {
+    background: #3498db;
+}
+
+#action-bar .raise-btn {
+    background: #f39c12;
+}
+
+#action-bar .allin-btn {
+    background: #e74c3c;
+    text-style: bold;
+}
+
+#bet-input {
+    width: 15;
+    margin: 0 1;
+}
+
+/* Pot Display */
+.pot-display {
+    text-align: center;
+    color: #f0c040;
+    text-style: bold;
+    width: 100%;
+    margin: 1 0;
+}
+
+/* Equity Display */
+#equity-panel {
+    dock: right;
+    width: 30;
+    background: #16213e;
+    padding: 1 2;
+    border-left: thick #333;
+}
+
+.equity-bar {
+    width: 100%;
+    height: 1;
+    margin: 1 0;
+}
+
+.equity-label {
+    color: #aaa;
+}
+
+.equity-value {
+    color: #2ecc71;
+    text-style: bold;
+}
+
+.recommendation {
+    color: #f0c040;
+    text-style: bold;
+    margin: 1 0;
+}
+
+/* Hand History */
+#hand-history {
+    dock: left;
+    width: 30;
+    background: #0f0f23;
+    padding: 1;
+    border-right: thick #333;
+    overflow-y: auto;
+}
+
+#hand-history .log-entry {
+    color: #ccc;
+    margin-bottom: 0;
+}
+
+/* Training Screen */
+#training-screen {
+    align: center middle;
+    padding: 2;
+}
+
+.progress-info {
+    width: 60;
+    height: auto;
+    padding: 2;
+    background: #16213e;
+    border: thick #333;
+}
