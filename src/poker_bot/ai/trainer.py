@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import random
 import time
 from pathlib import Path
@@ -112,8 +111,8 @@ class NLHEGameAdapter(GameAdapter):
 
     def apply_action(self, state, action_idx: int):
         """Apply abstract action to state."""
-        gs = copy.deepcopy(state.game_state)
-        deck = copy.deepcopy(state.deck)
+        gs = state.game_state.clone()
+        deck = state.deck.clone()
 
         # Map abstract index back to concrete action
         actions = self.action_abs.abstract_actions(gs)
@@ -174,10 +173,12 @@ class NLHETrainer:
         checkpoint_interval: int = 10_000,
         starting_stack: int = 10000,
         blinds: BlindStructure | None = None,
+        num_workers: int = 1,
     ) -> None:
         self.num_players = num_players
         self.output_dir = Path(output_dir)
         self.checkpoint_interval = checkpoint_interval
+        self.num_workers = num_workers
 
         self.card_abs = CardAbstraction()
         abs_path = self.output_dir / "abstraction"
@@ -193,21 +194,45 @@ class NLHETrainer:
             action_abstraction=self.action_abs,
         )
 
-        self.cfr = MCCFR(self.game_adapter, seed=42)
+        if num_workers > 1:
+            from poker_bot.ai.parallel_mccfr import ParallelMCCFR
+            self._parallel = ParallelMCCFR(
+                self.game_adapter, num_workers=num_workers, base_seed=42,
+            )
+            self.cfr = self._parallel.cfr
+        else:
+            self._parallel = None
+            self.cfr = MCCFR(self.game_adapter, seed=42)
 
     def train(self, iterations: int) -> None:
         """Run MCCFR training for given iterations."""
-        print(f"Starting MCCFR training: {iterations} iterations, {self.num_players} players")
+        print(f"Starting MCCFR training: {iterations} iterations, "
+              f"{self.num_players} players, {self.num_workers} workers")
         start = time.time()
 
-        for i in tqdm(range(1, iterations + 1), desc="MCCFR"):
-            self.cfr.iterate()
+        if self._parallel:
+            # Parallel training: run in batches of checkpoint_interval
+            remaining = iterations
+            done = 0
+            while remaining > 0:
+                batch = min(remaining, self.checkpoint_interval)
+                self._parallel.train(batch)
+                done += batch
+                remaining -= batch
 
-            if i % self.checkpoint_interval == 0:
                 elapsed = time.time() - start
                 n_info = len(self.cfr.info_sets)
-                print(f"\n  Checkpoint {i}: {n_info} info sets, {elapsed:.1f}s elapsed")
-                self._save_checkpoint(i)
+                print(f"\n  Checkpoint {done}: {n_info} info sets, {elapsed:.1f}s elapsed")
+                self._save_checkpoint(done)
+        else:
+            for i in tqdm(range(1, iterations + 1), desc="MCCFR"):
+                self.cfr.iterate()
+
+                if i % self.checkpoint_interval == 0:
+                    elapsed = time.time() - start
+                    n_info = len(self.cfr.info_sets)
+                    print(f"\n  Checkpoint {i}: {n_info} info sets, {elapsed:.1f}s elapsed")
+                    self._save_checkpoint(i)
 
         # Save final strategy
         self._save_final()

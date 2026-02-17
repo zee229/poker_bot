@@ -106,13 +106,59 @@ class CardAbstraction:
             keys.append(key)
 
         features_arr = np.array(features)
-        labels = self._kmeans(features_arr, self.num_buckets["turn"])
+        labels = self._kmeans(features_arr, self.num_buckets["turn"], metric="emd")
 
         bucket_map = {}
         for key, label in zip(keys, labels):
             bucket_map[key] = int(label)
 
         self._lut["turn"] = bucket_map
+        return bucket_map
+
+    def compute_flop_buckets(
+        self, num_samples: int = 5000, num_rollouts: int = 50
+    ) -> dict[str, int]:
+        """Compute flop buckets using equity distribution over turn outcomes."""
+        deck = make_deck()
+        features = []
+        keys = []
+        num_turn = self.num_buckets["turn"]
+
+        rng = random.Random(42)
+
+        for _ in range(num_samples):
+            rng.shuffle(deck)
+            hole = deck[:2]
+            board = deck[2:5]  # 3 community cards (flop)
+
+            histogram = np.zeros(num_turn)
+            used = set(c.int_value for c in hole + board)
+            remaining = [c for c in make_deck() if c.int_value not in used]
+
+            turn_lut = self._lut.get("turn", {})
+            for _ in range(num_rollouts):
+                rng.shuffle(remaining)
+                turn_card = remaining[0]
+                turn_board = board + [turn_card]
+                turn_key = _hand_key(hole, turn_board)
+                bucket = turn_lut.get(
+                    turn_key, int(_fnv1a(turn_key) % num_turn)
+                )
+                histogram[bucket] += 1
+
+            histogram /= histogram.sum() + 1e-10
+            key = _hand_key(hole, board)
+            features.append(histogram)
+            keys.append(key)
+
+        features_arr = np.array(features)
+        labels = self._kmeans(features_arr, self.num_buckets["flop"], metric="emd")
+
+        bucket_map = {}
+        for key, label in zip(keys, labels):
+            bucket_map[key] = int(label)
+
+        self._lut["flop"] = bucket_map
         return bucket_map
 
     def compute_preflop_buckets(self) -> dict[str, int]:
@@ -185,10 +231,13 @@ class CardAbstraction:
         river_samples: int = 10000,
         turn_samples: int = 5000,
         turn_rollouts: int = 50,
+        flop_samples: int = 5000,
+        flop_rollouts: int = 50,
     ) -> None:
-        """Run full bottom-up pipeline: river -> turn -> preflop, then save."""
+        """Run full bottom-up pipeline: river -> turn -> flop -> preflop."""
         self.compute_river_buckets(num_samples=river_samples)
         self.compute_turn_buckets(num_samples=turn_samples, num_rollouts=turn_rollouts)
+        self.compute_flop_buckets(num_samples=flop_samples, num_rollouts=flop_rollouts)
         self.compute_preflop_buckets()
 
     def save(self, path: Path) -> None:
@@ -208,8 +257,10 @@ class CardAbstraction:
                 values = np.load(val_file)
                 self._lut[street] = dict(zip(keys, values.astype(int)))
 
-    def _kmeans(self, data: np.ndarray, k: int, max_iter: int = 50) -> np.ndarray:
-        """Simple k-means clustering."""
+    def _kmeans(
+        self, data: np.ndarray, k: int, max_iter: int = 50, metric: str = "euclidean",
+    ) -> np.ndarray:
+        """K-means clustering with Euclidean or EMD distance."""
         n = len(data)
         if n <= k:
             return np.arange(n)
@@ -220,7 +271,10 @@ class CardAbstraction:
 
         labels = np.zeros(n, dtype=int)
         for _ in range(max_iter):
-            dists = cdist(data, centroids, metric="euclidean")
+            if metric == "emd":
+                dists = _emd_distance_matrix(data, centroids)
+            else:
+                dists = cdist(data, centroids, metric="euclidean")
             new_labels = np.argmin(dists, axis=1)
 
             if np.array_equal(new_labels, labels):
@@ -233,6 +287,17 @@ class CardAbstraction:
                     centroids[j] = data[mask].mean(axis=0)
 
         return labels
+
+
+def _emd_distance_matrix(data: np.ndarray, centroids: np.ndarray) -> np.ndarray:
+    """Compute 1D EMD (Earth Mover's Distance) between data and centroids.
+
+    For 1D histograms, EMD = sum(|CDF_a - CDF_b|). Vectorized with broadcasting.
+    Returns shape (n, k) distance matrix.
+    """
+    cdf_data = np.cumsum(data, axis=1)          # (n, d)
+    cdf_cent = np.cumsum(centroids, axis=1)      # (k, d)
+    return np.sum(np.abs(cdf_data[:, None, :] - cdf_cent[None, :, :]), axis=2)
 
 
 def _fnv1a(key: str) -> int:

@@ -16,13 +16,27 @@ from poker_bot.game.state import GameState, Street
 
 
 class BotPlayer:
-    """Bot that uses CFR strategy or equity-based heuristic."""
+    """Bot that uses CFR strategy or equity-based heuristic.
 
-    def __init__(self, strategy_dir: Path | None = None, seed: int = 42) -> None:
+    Decision hierarchy:
+    1. CFR blueprint strategy (if available and key found)
+    2. Subgame solver (if enabled, refines strategy for current decision)
+    3. Equity-based heuristic (always available)
+    """
+
+    def __init__(
+        self,
+        strategy_dir: Path | None = None,
+        seed: int = 42,
+        use_subgame: bool = False,
+        subgame_iterations: int = 500,
+        subgame_time_budget: float = 2.0,
+    ) -> None:
         self._rng = random.Random(seed)
         self._strategy_store: StrategyStore | None = None
         self._card_abs: CardAbstraction | None = None
         self._action_abs = ActionAbstraction()
+        self._subgame_solver = None
 
         if strategy_dir:
             final_path = strategy_dir / "final"
@@ -34,18 +48,36 @@ class BotPlayer:
                 if abs_path.exists():
                     self._card_abs.load(abs_path)
 
+        if use_subgame and self._card_abs:
+            from poker_bot.ai.subgame import SubgameSolver
+            from poker_bot.game.rules import BlindStructure
+            self._subgame_solver = SubgameSolver(
+                card_abstraction=self._card_abs,
+                action_abstraction=self._action_abs,
+                blinds=BlindStructure(50, 100),
+                blueprint=self._strategy_store,
+                default_iterations=subgame_iterations,
+                time_budget=subgame_time_budget,
+            )
+
     @property
     def has_model(self) -> bool:
         return self._strategy_store is not None and self._strategy_store.size > 0
 
     def decide(self, state: GameState, seat: int, legal_actions: list[Action]) -> Action:
-        """Choose an action. Tries CFR strategy first, falls back to equity heuristic."""
+        """Choose an action. Tries CFR strategy first, then subgame, falls back to equity."""
         if not legal_actions:
             return Action.fold()
 
         # Try CFR strategy
         if self.has_model:
             action = self._cfr_decide(state, seat, legal_actions)
+            if action is not None:
+                return action
+
+        # Try subgame solving
+        if self._subgame_solver:
+            action = self._subgame_decide(state, seat, legal_actions)
             if action is not None:
                 return action
 
@@ -94,6 +126,37 @@ class BotPlayer:
         chosen_idx = self._rng.choices(range(len(probs)), weights=probs)[0]
 
         # Map abstract index to concrete action
+        for a in legal_actions:
+            if ActionAbstraction.action_index(a, state) == chosen_idx:
+                return a
+
+        return legal_actions[0]
+
+    def _subgame_decide(
+        self, state: GameState, seat: int, legal_actions: list[Action]
+    ) -> Action | None:
+        """Use subgame solver to refine strategy for current decision."""
+        strategy = self._subgame_solver.get_strategy_for_state(state, seat)
+        if strategy is None:
+            return None
+
+        # Zero out illegal abstract action indices
+        probs = strategy.copy()
+        legal_indices = set()
+        for a in legal_actions:
+            legal_indices.add(ActionAbstraction.action_index(a, state))
+
+        for i in range(len(probs)):
+            if i not in legal_indices:
+                probs[i] = 0.0
+
+        total = probs.sum()
+        if total <= 0:
+            return None
+        probs /= total
+
+        chosen_idx = self._rng.choices(range(len(probs)), weights=probs)[0]
+
         for a in legal_actions:
             if ActionAbstraction.action_index(a, state) == chosen_idx:
                 return a

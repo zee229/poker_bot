@@ -68,3 +68,22 @@ class GameState:
         if idx < len(self.action_history):
             return self.action_history[idx]
         return []
+
+    def clone(self) -> GameState:
+        """Fast shallow clone — avoids copy.deepcopy overhead."""
+        return GameState(
+            players=[p.clone() for p in self.players],
+            blinds=self.blinds,
+            board=list(self.board),
+            street=self.street,
+            pots=[Pot(amount=p.amount, eligible=list(p.eligible)) for p in self.pots],
+            current_bet=self.current_bet,
+            min_raise=self.min_raise,
+            action_to=self.action_to,
+            dealer=self.dealer,
+            action_history=[list(s) for s in self.action_history],
+            hand_over=self.hand_over,
+            winners=list(self.winners) if self.winners else None,
+            last_raiser=self.last_raiser,
+            num_actions_this_street=self.num_actions_this_street,
+        )

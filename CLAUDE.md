@@ -8,8 +8,9 @@ CLI poker bot for Texas Hold'em No-Limit (6-max) with CFR solver.
 
 ## Project Structure
 - `src/poker_bot/game/` — Game engine (card, deck, hand_eval, actions, player, state, engine, rules)
-- `src/poker_bot/ai/` — CFR solver (infoset, cfr_base, vanilla_cfr, mccfr, strategy, trainer, advisor, bot)
-- `src/poker_bot/ai/abstraction/` — Card/action abstraction, suit isomorphism
+- `src/poker_bot/ai/` — CFR solver (infoset, cfr_base, vanilla_cfr, mccfr, parallel_mccfr, strategy, trainer, advisor, bot, subgame)
+- `src/poker_bot/ai/abstraction/` — Card/action abstraction, suit isomorphism, EMD clustering
+- `src/poker_bot/ai/deep_cfr/` — Deep CFR with PyTorch (features, networks, memory, training loop)
 - `src/poker_bot/games/` — Toy games (kuhn, leduc) for CFR validation
 - `src/poker_bot/ui/` — Textual TUI (screens, widgets, styles)
 - `tests/` — 93 tests covering all components

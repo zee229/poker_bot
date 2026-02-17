@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import enum
 from abc import ABC, abstractmethod
 
 from poker_bot.ai.infoset import InfoSetStore
+
+
+class CFRVariant(enum.Enum):
+    VANILLA = "vanilla"
+    CFR_PLUS = "cfr_plus"
+    DCFR = "dcfr"
 
 
 class GameAdapter(ABC):

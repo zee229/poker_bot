@@ -6,7 +6,7 @@ import random
 
 import numpy as np
 
-from poker_bot.ai.cfr_base import CFRBase, GameAdapter
+from poker_bot.ai.cfr_base import CFRBase, CFRVariant, GameAdapter
 
 
 class MCCFR(CFRBase):
@@ -16,9 +16,13 @@ class MCCFR(CFRBase):
     Does not require reach probabilities — simpler and scales to large games.
     """
 
-    def __init__(self, game: GameAdapter, seed: int | None = None) -> None:
+    def __init__(
+        self, game: GameAdapter, seed: int | None = None,
+        variant: CFRVariant = CFRVariant.VANILLA,
+    ) -> None:
         super().__init__(game)
         self.rng = random.Random(seed)
+        self.variant = variant
 
     def iterate(self) -> None:
         """Run one iteration: traverse for each player."""
@@ -59,7 +63,12 @@ class MCCFR(CFRBase):
 
             # Update cumulative regret and strategy
             regrets = action_values - node_value
-            info_set.update_regret(regrets)
+            if self.variant == CFRVariant.CFR_PLUS:
+                info_set.update_regret_cfr_plus(regrets)
+            elif self.variant == CFRVariant.DCFR:
+                info_set.update_regret_dcfr(regrets, self.iterations + 1)
+            else:
+                info_set.update_regret(regrets)
             info_set.cumulative_strategy += strategy
 
             return node_value

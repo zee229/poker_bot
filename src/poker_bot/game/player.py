@@ -45,3 +45,12 @@ class Player:
 
     def reset_street_bet(self) -> None:
         self.bet_this_street = 0
+
+    def clone(self) -> Player:
+        """Fast shallow clone — avoids copy.deepcopy overhead."""
+        return Player(
+            name=self.name, seat=self.seat, stack=self.stack,
+            hole_cards=list(self.hole_cards), status=self.status,
+            bet_this_street=self.bet_this_street,
+            bet_this_hand=self.bet_this_hand, is_human=self.is_human,
+        )

@@ -76,7 +76,8 @@ def train_toy(game: str, iterations: int, output: str | None) -> None:
 @click.option("--output", "-o", default="data/nlhe/abstraction", help="Output directory")
 @click.option("--river-samples", default=10000, help="River sampling count")
 @click.option("--turn-samples", default=5000, help="Turn sampling count")
-def compute_abstraction(output: str, river_samples: int, turn_samples: int) -> None:
+@click.option("--flop-samples", default=5000, help="Flop sampling count")
+def compute_abstraction(output: str, river_samples: int, turn_samples: int, flop_samples: int) -> None:
     """Precompute card abstraction buckets."""
     from pathlib import Path
     from poker_bot.ai.abstraction.card_abstraction import CardAbstraction
@@ -86,6 +87,8 @@ def compute_abstraction(output: str, river_samples: int, turn_samples: int) -> N
     abs_.compute_river_buckets(num_samples=river_samples)
     click.echo(f"Computing turn buckets ({turn_samples} samples)...")
     abs_.compute_turn_buckets(num_samples=turn_samples)
+    click.echo(f"Computing flop buckets ({flop_samples} samples)...")
+    abs_.compute_flop_buckets(num_samples=flop_samples)
     click.echo("Computing preflop buckets...")
     abs_.compute_preflop_buckets()
 
@@ -99,7 +102,8 @@ def compute_abstraction(output: str, river_samples: int, turn_samples: int) -> N
 @click.option("--iterations", "-n", default=100_000, help="Number of MCCFR iterations")
 @click.option("--output", "-o", default="data/nlhe", help="Output directory")
 @click.option("--checkpoint", "-c", default=10_000, help="Checkpoint interval")
-def train(players: int, iterations: int, output: str, checkpoint: int) -> None:
+@click.option("--workers", "-w", default=1, help="Number of parallel workers")
+def train(players: int, iterations: int, output: str, checkpoint: int, workers: int) -> None:
     """Train MCCFR for NLHE."""
     from poker_bot.ai.trainer import NLHETrainer
 
@@ -107,7 +111,8 @@ def train(players: int, iterations: int, output: str, checkpoint: int) -> None:
         num_players=players,
         output_dir=output,
         checkpoint_interval=checkpoint,
+        num_workers=workers,
     )
-    click.echo(f"Training {players}-player NLHE for {iterations} iterations...")
+    click.echo(f"Training {players}-player NLHE for {iterations} iterations ({workers} workers)...")
     trainer.train(iterations)
     click.echo("Done.")

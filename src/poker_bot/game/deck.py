@@ -37,3 +37,12 @@ class Deck:
             self._rng = random.Random(seed)
         self._index = 0
         self.shuffle()
+
+    def clone(self) -> Deck:
+        """Fast clone — avoids copy.deepcopy overhead."""
+        new = Deck.__new__(Deck)
+        new._cards = list(self._cards)
+        new._rng = random.Random()
+        new._rng.setstate(self._rng.getstate())
+        new._index = self._index
+        return new

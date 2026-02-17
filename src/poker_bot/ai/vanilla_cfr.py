@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from poker_bot.ai.cfr_base import CFRBase, GameAdapter
+from poker_bot.ai.cfr_base import CFRBase, CFRVariant, GameAdapter
 
 
 class VanillaCFR(CFRBase):
     """Vanilla Counterfactual Regret Minimization with full tree traversal."""
 
-    def __init__(self, game: GameAdapter) -> None:
+    def __init__(self, game: GameAdapter, variant: CFRVariant = CFRVariant.VANILLA) -> None:
         super().__init__(game)
+        self.variant = variant
 
     def iterate(self) -> None:
         """Run one iteration: traverse for each player."""
@@ -44,7 +45,10 @@ class VanillaCFR(CFRBase):
         info_set = self.info_sets.get_or_create(key, num_actions)
 
         # Get strategy via regret matching
-        strategy = info_set.update_strategy(reach[current])
+        if self.variant == CFRVariant.DCFR:
+            strategy = info_set.update_strategy_dcfr(reach[current], self.iterations + 1)
+        else:
+            strategy = info_set.update_strategy(reach[current])
 
         action_values = np.zeros(num_actions, dtype=np.float64)
         node_value = 0.0
@@ -62,6 +66,11 @@ class VanillaCFR(CFRBase):
             # Counterfactual reach: product of opponents' reach probs
             cf_reach = np.prod(reach[:current]) * np.prod(reach[current + 1 :])
             regrets = cf_reach * (action_values - node_value)
-            info_set.update_regret(regrets)
+            if self.variant == CFRVariant.CFR_PLUS:
+                info_set.update_regret_cfr_plus(regrets)
+            elif self.variant == CFRVariant.DCFR:
+                info_set.update_regret_dcfr(regrets, self.iterations + 1)
+            else:
+                info_set.update_regret(regrets)
 
         return node_value
