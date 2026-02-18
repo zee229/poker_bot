@@ -79,11 +79,8 @@ class MCCFR(CFRBase):
             return self._traverse(next_state, traversing_player)
 
     def _sample_weighted(self, weights) -> int:
-        """Sample index from weighted distribution."""
-        r = self.rng.random()
-        cumsum = 0.0
-        for i, w in enumerate(weights):
-            cumsum += w
-            if r < cumsum:
-                return i
-        return len(weights) - 1
+        """Sample index from weighted distribution using vectorized cumsum."""
+        if not isinstance(weights, np.ndarray):
+            weights = np.asarray(weights, dtype=np.float64)
+        cumsum = np.cumsum(weights)
+        return int(np.searchsorted(cumsum, self.rng.random()))

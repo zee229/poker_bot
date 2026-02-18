@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 deep = ["torch>=2.1.0"]
+fast = ["numba>=0.59.0"]
 
 [project.scripts]
 poker-bot = "poker_bot.cli:cli"

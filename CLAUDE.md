@@ -5,15 +5,17 @@ CLI poker bot for Texas Hold'em No-Limit (6-max) with CFR solver.
 ## Stack
 - Python 3.12, uv package manager
 - Textual (TUI), eval7 (hand eval), numpy/scipy (numerics), click (CLI)
+- Optional: numba (JIT acceleration), torch (Deep CFR, ReBeL)
 
 ## Project Structure
 - `src/poker_bot/game/` — Game engine (card, deck, hand_eval, actions, player, state, engine, rules)
-- `src/poker_bot/ai/` — CFR solver (infoset, cfr_base, vanilla_cfr, mccfr, parallel_mccfr, strategy, trainer, advisor, bot, subgame)
-- `src/poker_bot/ai/abstraction/` — Card/action abstraction, suit isomorphism, EMD clustering
+- `src/poker_bot/ai/` — CFR solver (infoset, cfr_base, vanilla_cfr, mccfr, parallel_mccfr, strategy, trainer, advisor, bot, subgame, opponent_model)
+- `src/poker_bot/ai/abstraction/` — Card/action abstraction (with presets: compact/standard/detailed), suit isomorphism, EMD clustering, action translation
 - `src/poker_bot/ai/deep_cfr/` — Deep CFR with PyTorch (features, networks, memory, training loop)
+- `src/poker_bot/ai/rebel/` — ReBeL: recursive belief-based learning (belief, value_net, rebel)
 - `src/poker_bot/games/` — Toy games (kuhn, leduc) for CFR validation
 - `src/poker_bot/ui/` — Textual TUI (screens, widgets, styles)
-- `tests/` — 93 tests covering all components
+- `tests/` — 210 tests covering all components
 
 ## Key Commands
 - `poker-bot play` — Play against bots (TUI)
@@ -25,16 +27,20 @@ CLI poker bot for Texas Hold'em No-Limit (6-max) with CFR solver.
 ## Architecture Notes
 - Card is frozen dataclass with eval7 conversion
 - GameEngine.apply_action() returns updated GameState (used for both UI and CFR tree traversal)
-- InfoSet stores cumulative regret and strategy; regret matching normalizes positive regrets
-- VanillaCFR: full tree traversal, suitable for Kuhn/Leduc
-- MCCFR: external sampling, scales to large games
+- InfoSet stores cumulative regret and strategy; regret matching uses Numba JIT when available, numpy fallback otherwise
+- VanillaCFR: full tree traversal with in-place reach update+restore (avoids array copies), suitable for Kuhn/Leduc
+- MCCFR: external sampling with np.searchsorted-based weighted sampling, scales to large games
 - Exploitability uses two-pass info-set-constrained best response (not omniscient)
 - StrategyStore uses sorted uint64 hashes with binary search for O(log n) lookup
-- BotPlayer uses CFR strategy when available, falls back to equity-based heuristic
+- BotPlayer uses CFR strategy when available, applies opponent model adjustments, falls back to equity-based heuristic
 - Card abstraction uses deterministic FNV-1a hash fallback; turn buckets link to river LUT
-- Trainer deep-copies state in apply_action; action history uses "/" street delimiters
+- Trainer deep-copies state in apply_action; caches action index mapping; action history uses "/" street delimiters
+- ActionAbstraction supports presets: "compact" (9 actions, default), "standard" (18), "detailed" (25)
+- ActionTranslator maps real opponent bets to nearest abstract action for strategy lookup
+- OpponentModel tracks VPIP/PFR/AF/cbet stats, classifies into player types (nit/tag/lag/station/maniac), provides exploitative strategy adjustments
+- ReBeL operates on Public Belief States (PBS) with Bayesian belief updates; uses depth-limited CFR + value network at leaves
 
 ## Testing
-- `uv run pytest tests/` — Run all 93 tests
+- `uv run pytest tests/` — Run all 210 tests (11 skipped without torch)
 - Kuhn CFR converges to Nash equilibrium (exploitability < 0.01)
 - Leduc CFR exploitability decreases monotonically

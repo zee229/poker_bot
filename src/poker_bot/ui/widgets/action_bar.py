@@ -66,35 +66,35 @@ class ActionBar(Widget):
         pot = self._state.main_pot
 
         if to_call > 0:
-            yield Button("Fold", id="btn-fold", classes="fold-btn")
+            yield Button("[f] Fold", id="btn-fold", classes="fold-btn")
             call_amt = min(to_call, player.stack)
             if call_amt >= player.stack:
-                yield Button(f"All-In ${call_amt:,}", id="btn-allin-call", classes="allin-btn")
+                yield Button(f"[x] All-In ${call_amt:,}", id="btn-allin-call", classes="allin-btn")
             else:
-                yield Button(f"Call ${call_amt:,}", id="btn-call", classes="call-btn")
+                yield Button(f"[x] Call ${call_amt:,}", id="btn-call", classes="call-btn")
         else:
-            yield Button("Check", id="btn-check", classes="check-btn")
+            yield Button("[x] Check", id="btn-check", classes="check-btn")
 
         # Bet/Raise sizes
         if player.stack > to_call:
             remaining = player.stack - to_call
+            size_keys = [("1", "1/3", 0.33), ("2", "1/2", 0.5), ("3", "3/4", 0.75), ("4", "Pot", 1.0)]
             if self._state.current_bet == 0:
-                # Bet sizes as pot fractions
-                for label, frac in [("1/3", 0.33), ("1/2", 0.5), ("3/4", 0.75), ("Pot", 1.0)]:
+                for key, label, frac in size_keys:
                     amount = max(int(pot * frac), self._state.blinds.big_blind)
                     if amount < remaining:
-                        yield Button(f"{label}", id=f"btn-bet-{label}", classes="size-btn")
-
+                        btn_id = label.replace("/", "-")
+                        yield Button(f"[{key}] {label}", id=f"btn-bet-{btn_id}", classes="size-btn")
             else:
-                # Raise sizes
-                for label, frac in [("1/2", 0.5), ("3/4", 0.75), ("Pot", 1.0)]:
+                for key, label, frac in size_keys[1:]:  # skip 1/3 for raises
                     raise_amount = int(pot * frac)
                     raise_to = self._state.current_bet + raise_amount
                     chips_needed = raise_to - player.bet_this_street
                     if 0 < chips_needed < player.stack:
-                        yield Button(f"R {label}", id=f"btn-raise-{label}", classes="raise-btn")
+                        btn_id = label.replace("/", "-")
+                        yield Button(f"[{key}] R {label}", id=f"btn-raise-{btn_id}", classes="raise-btn")
 
-            yield Button(f"All-In ${player.stack:,}", id="btn-allin", classes="allin-btn")
+            yield Button(f"[a] All-In ${player.stack:,}", id="btn-allin", classes="allin-btn")
 
             yield Input(placeholder="Custom...", id="bet-input", type="integer")
 
@@ -120,13 +120,13 @@ class ActionBar(Widget):
         elif btn_id == "btn-allin":
             action = Action.all_in(player.stack)
         elif btn_id and btn_id.startswith("btn-bet-"):
-            frac_map = {"1/3": 0.33, "1/2": 0.5, "3/4": 0.75, "Pot": 1.0}
+            frac_map = {"1-3": 0.33, "1-2": 0.5, "3-4": 0.75, "Pot": 1.0}
             label = btn_id.replace("btn-bet-", "")
             frac = frac_map.get(label, 0.5)
             amount = max(int(pot * frac), self._state.blinds.big_blind)
             action = Action.bet(amount)
         elif btn_id and btn_id.startswith("btn-raise-"):
-            frac_map = {"1/2": 0.5, "3/4": 0.75, "Pot": 1.0}
+            frac_map = {"1-2": 0.5, "3-4": 0.75, "Pot": 1.0}
             label = btn_id.replace("btn-raise-", "")
             frac = frac_map.get(label, 0.5)
             raise_amount = int(pot * frac)

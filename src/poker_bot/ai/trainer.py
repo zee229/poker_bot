@@ -100,29 +100,38 @@ class NLHEGameAdapter(GameAdapter):
     def legal_actions(self, state) -> list[int]:
         """Return abstract action indices."""
         actions = self.action_abs.abstract_actions(state.game_state)
+        # Build index→action cache for this state
         indices = []
         seen = set()
+        idx_to_action = {}
         for a in actions:
             idx = ActionAbstraction.action_index(a, state.game_state)
             if idx not in seen:
                 seen.add(idx)
                 indices.append(idx)
+                idx_to_action[idx] = a
+        state._action_cache = idx_to_action
         return sorted(indices)
 
-    def apply_action(self, state, action_idx: int):
+    def apply_action(self, state, action_idx):
         """Apply abstract action to state."""
+        # Chance node: action IS the next state (NLHEState from deal)
+        if isinstance(state, str):
+            return action_idx
+
         gs = state.game_state.clone()
         deck = state.deck.clone()
 
-        # Map abstract index back to concrete action
-        actions = self.action_abs.abstract_actions(gs)
-        target = None
-        for a in actions:
-            if ActionAbstraction.action_index(a, gs) == action_idx:
-                target = a
-                break
+        # Use cached mapping if available, otherwise scan
+        target = getattr(state, '_action_cache', {}).get(action_idx)
         if target is None:
-            target = actions[0] if actions else Action.fold()
+            actions = self.action_abs.abstract_actions(gs)
+            for a in actions:
+                if ActionAbstraction.action_index(a, gs) == action_idx:
+                    target = a
+                    break
+            if target is None:
+                target = actions[0] if actions else Action.fold()
 
         prev_street = gs.street
 
@@ -135,14 +144,15 @@ class NLHEGameAdapter(GameAdapter):
 
         new_gs = engine.apply_action(target, gs)
 
-        # Street delimiter: "/" when street changes
+        # Build history using list join instead of repeated string concat
         sep = "/" if new_gs.street != prev_street else ""
+        new_history = f"{state.action_history_str}{action_idx}:{sep}"
         return NLHEState(
             game_state=new_gs,
             deck=deck,
             card_abstraction=state.card_abstraction,
             action_abstraction=state.action_abstraction,
-            action_history_str=state.action_history_str + f"{action_idx}:{sep}",
+            action_history_str=new_history,
         )
 
     def chance_outcomes(self, state) -> list[tuple]:

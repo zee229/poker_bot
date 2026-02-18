@@ -32,10 +32,9 @@ class VanillaCFR(CFRBase):
         if current == -1:  # chance node
             value = 0.0
             for action, prob in self.game.chance_outcomes(state):
-                new_reach = reach.copy()
-                # Chance doesn't belong to any player
+                # Chance doesn't affect any player's reach — no need to copy
                 next_state = self.game.apply_action(state, action)
-                value += prob * self._cfr(next_state, traversing_player, new_reach)
+                value += prob * self._cfr(next_state, traversing_player, reach)
             return value
 
         actions = self.game.legal_actions(state)
@@ -53,13 +52,14 @@ class VanillaCFR(CFRBase):
         action_values = np.zeros(num_actions, dtype=np.float64)
         node_value = 0.0
 
+        # In-place update + restore avoids reach.copy() per action
+        old_reach = reach[current]
         for i, action in enumerate(actions):
-            new_reach = reach.copy()
-            new_reach[current] *= strategy[i]
-
+            reach[current] = old_reach * strategy[i]
             next_state = self.game.apply_action(state, action)
-            action_values[i] = self._cfr(next_state, traversing_player, new_reach)
+            action_values[i] = self._cfr(next_state, traversing_player, reach)
             node_value += strategy[i] * action_values[i]
+        reach[current] = old_reach  # restore
 
         # Update regrets only for traversing player's info sets
         if current == traversing_player:

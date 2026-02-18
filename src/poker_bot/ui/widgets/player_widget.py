@@ -54,10 +54,11 @@ class PlayerWidget(Widget):
 
     is_turn: reactive[bool] = reactive(False)
 
-    def __init__(self, player: Player, show_cards: bool = False, **kwargs):
+    def __init__(self, player: Player, show_cards: bool = False, is_turn: bool = False, **kwargs):
         super().__init__(**kwargs)
         self._player = player
         self._show_cards = show_cards
+        self.is_turn = is_turn
 
     def compose(self) -> ComposeResult:
         p = self._player

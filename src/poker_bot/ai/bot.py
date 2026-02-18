@@ -22,6 +22,8 @@ class BotPlayer:
     1. CFR blueprint strategy (if available and key found)
     2. Subgame solver (if enabled, refines strategy for current decision)
     3. Equity-based heuristic (always available)
+
+    Optional opponent modeling adjusts strategy based on opponent tendencies.
     """
 
     def __init__(
@@ -31,12 +33,14 @@ class BotPlayer:
         use_subgame: bool = False,
         subgame_iterations: int = 500,
         subgame_time_budget: float = 2.0,
+        opponent_model: object | None = None,
     ) -> None:
         self._rng = random.Random(seed)
         self._strategy_store: StrategyStore | None = None
         self._card_abs: CardAbstraction | None = None
         self._action_abs = ActionAbstraction()
         self._subgame_solver = None
+        self._opponent_model = opponent_model
 
         if strategy_dir:
             final_path = strategy_dir / "final"
@@ -65,26 +69,49 @@ class BotPlayer:
         return self._strategy_store is not None and self._strategy_store.size > 0
 
     def decide(self, state: GameState, seat: int, legal_actions: list[Action]) -> Action:
-        """Choose an action. Tries CFR strategy first, then subgame, falls back to equity."""
+        """Choose an action. Tries CFR strategy first, then subgame, falls back to equity.
+
+        If opponent_model is set, exploitative adjustments are applied to the strategy.
+        """
         if not legal_actions:
             return Action.fold()
 
+        # Determine target opponent seat for adjustments
+        opponent_seat = self._find_opponent_seat(state, seat)
+
         # Try CFR strategy
         if self.has_model:
-            action = self._cfr_decide(state, seat, legal_actions)
+            action = self._cfr_decide(state, seat, legal_actions, opponent_seat)
             if action is not None:
                 return action
 
         # Try subgame solving
         if self._subgame_solver:
-            action = self._subgame_decide(state, seat, legal_actions)
+            action = self._subgame_decide(state, seat, legal_actions, opponent_seat)
             if action is not None:
                 return action
 
         return self._equity_decide(state, seat, legal_actions)
 
+    def _find_opponent_seat(self, state: GameState, our_seat: int) -> int | None:
+        """Find the main opponent seat (for heads-up adjustments)."""
+        if not self._opponent_model:
+            return None
+        opponents = [p.seat for p in state.players if p.is_in_hand and p.seat != our_seat]
+        return opponents[0] if len(opponents) == 1 else None
+
+    def _apply_opponent_adjustments(
+        self, probs: np.ndarray, opponent_seat: int | None,
+        state: GameState,
+    ) -> np.ndarray:
+        """Apply opponent model adjustments to strategy probabilities."""
+        if not self._opponent_model or opponent_seat is None:
+            return probs
+        return self._opponent_model.adjust_strategy(probs, opponent_seat, state)
+
     def _cfr_decide(
-        self, state: GameState, seat: int, legal_actions: list[Action]
+        self, state: GameState, seat: int, legal_actions: list[Action],
+        opponent_seat: int | None = None,
     ) -> Action | None:
         if not self._strategy_store or not self._card_abs:
             return None
@@ -123,6 +150,9 @@ class BotPlayer:
             return None
         probs /= total
 
+        # Apply opponent model adjustments
+        probs = self._apply_opponent_adjustments(probs, opponent_seat, state)
+
         chosen_idx = self._rng.choices(range(len(probs)), weights=probs)[0]
 
         # Map abstract index to concrete action
@@ -133,7 +163,8 @@ class BotPlayer:
         return legal_actions[0]
 
     def _subgame_decide(
-        self, state: GameState, seat: int, legal_actions: list[Action]
+        self, state: GameState, seat: int, legal_actions: list[Action],
+        opponent_seat: int | None = None,
     ) -> Action | None:
         """Use subgame solver to refine strategy for current decision."""
         strategy = self._subgame_solver.get_strategy_for_state(state, seat)
@@ -154,6 +185,9 @@ class BotPlayer:
         if total <= 0:
             return None
         probs /= total
+
+        # Apply opponent model adjustments
+        probs = self._apply_opponent_adjustments(probs, opponent_seat, state)
 
         chosen_idx = self._rng.choices(range(len(probs)), weights=probs)[0]
 

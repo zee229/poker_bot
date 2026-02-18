@@ -64,9 +64,12 @@ class StrategyStore:
 
 
 def _hash_key(key: str) -> np.uint64:
-    """Hash a string key to uint64 using FNV-1a."""
-    h = np.uint64(14695981039346656037)
-    for byte in key.encode():
-        h ^= np.uint64(byte)
-        h *= np.uint64(1099511628211)
+    """Hash a string key to uint64 using FNV-1a (overflow is intentional)."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        h = np.uint64(14695981039346656037)
+        for byte in key.encode():
+            h ^= np.uint64(byte)
+            h *= np.uint64(1099511628211)
     return h
